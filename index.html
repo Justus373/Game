@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falling Blocks Deluxe</title>
+<style>
+body {
+  margin:0;
+  font-family:sans-serif;
+  background: radial-gradient(circle at top, #1a1a2e, #0f0f1a);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+#ui {
+  text-align:center;
+  padding:10px;
+}
+
+input, button {
+  padding:8px;
+  border-radius:8px;
+  border:none;
+  margin:5px;
+  font-size:16px;
+}
+
+button {
+  background:#0077ff;
+  color:black;
+  font-weight:bold;
+}
+
+canvas {
+  border-radius:15px;
+  box-shadow:0 0 20px #a600ff;
+  touch-action:none;
+  width:90vw;
+  max-width:400px;
+  height:auto;
+}
+
+#leaderboard {
+  margin-top:10px;
+  background:#111;
+  padding:10px;
+  border-radius:10px;
+  width:90%;
+  max-width:400px;
+  box-shadow:0 0 10px #00d4ff;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <input id="nameInput" placeholder="Dein Name">
+  <button onclick="startGame()">Start</button>
+  <div id="score">Score: 0</div>
+  <div id="time">Time: 100</div>
+  <div id="level">Level: 1</div>
+</div>
+
+<canvas id="game" width="400" height="500"></canvas>
+
+<div id="leaderboard">
+  <h3>🏆 Highscores</h3>
+  <div id="scores"></div>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+
+let score=0;
+let time=100;
+let level=1;
+let speed=4;
+let running=false;
+
+const blocks=[];
+const effects=[];
+const blockSize=60;
+let spawnTimer=0;
+
+// ===== Farben =====
+const colors=[
+  {c:'cyan', points:1},
+  {c:'lime', points:2},
+  {c:'yellow', points:3},
+  {c:'red', points:5}
+];
+
+// ===== Start =====
+function startGame(){
+  const name=document.getElementById('nameInput').value.trim();
+  if(!name){ alert("Name eingeben!"); return; }
+
+  score=0; time=100; level=1; speed=4;
+  blocks.length=0; effects.length=0;
+  running=true;
+
+  updateUI();
+  timer();
+}
+
+// ===== Timer =====
+function timer(){
+  const t=setInterval(()=>{
+    if(!running){ clearInterval(t); return; }
+
+    time--;
+    if(time<=0){
+      running=false;
+      saveScore();
+      clearInterval(t);
+    }
+    updateUI();
+  },1000);
+}
+
+// ===== UI =====
+function updateUI(){
+  document.getElementById('score').innerText='Score: '+score;
+  document.getElementById('time').innerText='Time: '+time;
+  document.getElementById('level').innerText='Level: '+level;
+}
+
+// ===== Highscore =====
+function saveScore(){
+  const name=document.getElementById('nameInput').value;
+  let scores=JSON.parse(localStorage.getItem('scores')||"[]");
+
+  scores.push({name, score});
+  scores.sort((a,b)=>b.score-a.score);
+  scores=scores.slice(0,5);
+
+  localStorage.setItem('scores', JSON.stringify(scores));
+  showScores();
+}
+
+function showScores(){
+  const scores=JSON.parse(localStorage.getItem('scores')||"[]");
+  const div=document.getElementById('scores');
+  div.innerHTML='';
+  scores.forEach(s=>{
+    div.innerHTML+=`<div>${s.name}: ${s.score}</div>`;
+  });
+}
+showScores();
+
+// ===== Blocks =====
+function spawnBlock(){
+  const x=Math.random()*(canvas.width-blockSize);
+  const type=colors[Math.floor(Math.random()*colors.length)];
+  blocks.push({x:x, y:-blockSize, color:type.c, points:type.points});
+}
+
+// ===== Update =====
+function update(){
+  if(!running) return;
+
+  spawnTimer++;
+  if(spawnTimer>30-(level*2)){
+    spawnBlock();
+    spawnTimer=0;
+  }
+
+  for(let i=blocks.length-1;i>=0;i--){
+    blocks[i].y+=speed;
+
+    if(blocks[i].y>canvas.height){
+      blocks.splice(i,1);
+    }
+  }
+
+  // Level up
+  if(score > level*20 && level < 10){
+    level++;
+    speed+=1;
+  }
+
+  // Effekte
+  for(let i=effects.length-1;i>=0;i--){
+    effects[i].life--;
+    if(effects[i].life<=0) effects.splice(i,1);
+  }
+}
+
+// ===== Draw =====
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  blocks.forEach(b=>{
+    ctx.fillStyle=b.color;
+    ctx.shadowBlur=15;
+    ctx.shadowColor=b.color;
+    ctx.fillRect(b.x,b.y,blockSize,blockSize);
+  });
+
+  // Hit Effekt
+  effects.forEach(e=>{
+    ctx.fillStyle='white';
+    ctx.globalAlpha=e.life/10;
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,20,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+  });
+}
+
+// ===== Loop =====
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ===== Hit =====
+function checkHit(x,y){
+  if(!running) return;
+
+  for(let i=blocks.length-1;i>=0;i--){
+    const b=blocks[i];
+    const pad=15;
+
+    if(x>=b.x-pad && x<=b.x+blockSize+pad &&
+       y>=b.y-pad && y<=b.y+blockSize+pad){
+
+      score+=b.points;
+      effects.push({x:x,y:y,life:10});
+      blocks.splice(i,1);
+      updateUI();
+      break;
+    }
+  }
+}
+
+// ===== Input =====
+canvas.addEventListener('pointerdown', e=>{
+  const rect=canvas.getBoundingClientRect();
+  checkHit(e.clientX-rect.left, e.clientY-rect.top);
+});
+</script>
+
+</body>
+</html>
