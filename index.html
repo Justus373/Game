@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<link rel="icon" type="image/x-icon" href="favicon.png">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Falling Blocks Deluxe</title>
@@ -243,8 +243,11 @@ function checkHit(x,y){
 
 // ===== Input =====
 canvas.addEventListener('pointerdown', e=>{
-  const rect=canvas.getBoundingClientRect();
-  checkHit(e.clientX-rect.left, e.clientY-rect.top);
+  const rect = canvas.getBoundingClientRect();
+  // Skaliere die Pointer-Koordinaten auf das Canvas-System
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  checkHit(x, y);
 });
 </script>
 
